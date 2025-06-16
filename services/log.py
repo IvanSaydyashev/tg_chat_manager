@@ -4,12 +4,11 @@ from abc import abstractmethod
 from typing import Protocol, Any, Self
 from enum import Enum
 
-import firebase_admin
-from firebase_admin import credentials, db
 from firebase_admin.exceptions import FirebaseError
 from time import time
 from pydantic import BaseModel
 
+from services.firebase import FirebaseClient
 
 class Log(Protocol):
     @abstractmethod
@@ -38,18 +37,8 @@ class FirebaseLogFormat(BaseModel):
     reason: str
 
 
-class FirebaseLog(Log):
+class FirebaseLog(FirebaseClient):
     """Firebase Realtime DB Logs."""
-
-    def __init__(self, firebase_url: str, secret: str) -> None:
-        """
-        firebase_url: Firebase Runtime DB URL.
-        secret: Firebase Runtime DB secret.
-        """
-        cred = credentials.Certificate(secret)
-        firebase_admin.initialize_app(cred, {"databaseURL": firebase_url})
-        self.db = db
-
     async def awrite(self, status: Any, msg: Any) -> None:
         """
         Write log message in Firebase Runtime DB.
@@ -58,7 +47,7 @@ class FirebaseLog(Log):
         """
         log = FirebaseLogFormat.model_validate_json(msg)
         event = uuid.uuid4()
-        ref = self.db.reference(f"chats/{log.chat_id}/{event}")
+        ref = self.db.reference(f"logs/{log.chat_id}/{event}")
         timestamp = int(time() * 1000)
         data = {
             "timestamp": timestamp,
@@ -92,7 +81,7 @@ class FirebaseLog(Log):
         """
         log = FirebaseLogFormat.model_validate_json(msg)
         event = uuid.uuid4()
-        ref = self.db.reference(f"chats/{log.chat_id}/{event}")
+        ref = self.db.reference(f"logs/{log.chat_id}/{event}")
         timestamp = int(time() * 1000)
         data = {
             "timestamp": timestamp,

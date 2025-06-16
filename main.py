@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application
 
 from bot import Bot
-from services import LLMService, ConsoleLog, FirebaseLog
+from services import LLMService, ConsoleLog, FirebaseLog, FirebaseClient
 
 
 def main() -> None:
@@ -16,13 +16,14 @@ def main() -> None:
     console_log.set_name("httpx").set_level(logging.WARNING)
     console_log.set_name(__name__)
 
+    firebase_client = FirebaseClient(firebase_url=os.getenv("FIREBASE_DB_URL"), secret=os.getenv("FIREBASE_DB_SECRET"))
     firebase_log = FirebaseLog(firebase_url=os.getenv("FIREBASE_DB_URL"), secret=os.getenv("FIREBASE_DB_SECRET"))
 
     llm_service = LLMService(console_log=console_log)
 
     app = Application.builder().token(os.getenv("TOKEN")).build()
 
-    bot = Bot(llm_service=llm_service, firebase_log=firebase_log, console_log=console_log)
+    bot = Bot(llm_service=llm_service, firebase_client=firebase_client, firebase_log=firebase_log, console_log=console_log)
 
     app.add_error_handler(bot.error_handler)
 

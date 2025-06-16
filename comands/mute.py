@@ -99,3 +99,24 @@ class Mute:
         else:
             await context.bot.send_message(update.effective_chat.id,
                                            f"Пользователь @{update.message.reply_to_message.from_user.username} разговаривает! 🥳")
+
+    async def mute_user(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int, duration: str | None = None) -> None:
+        if duration:
+            duration = parse_duration(duration)
+            until_date = datetime.now(timezone.utc) + timedelta(seconds=duration)
+        else:
+            until_date = None
+
+        await self.firebase_logs.awrite(FirebaseAction.MUTE, dumps({
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "message": None,
+            "reason": "Автоматическая модерация (LLM)",
+        }))
+
+        await context.bot.restrict_chat_member(
+            chat_id=chat_id,
+            user_id=user_id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until_date,
+        )

@@ -52,3 +52,14 @@ class Kick:
 
         await context.bot.send_message(update.effective_chat.id,
                                        f"Пользователь @{update.message.reply_to_message.from_user.username} Кикнут.")
+
+    async def kick_user(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> None:
+        await context.bot.ban_chat_member(
+            chat_id=chat_id,
+            user_id=user_id,
+            revoke_messages=True
+        )
+        await context.bot.unban_chat_member(
+            chat_id=chat_id,
+            user_id=user_id,
+        )

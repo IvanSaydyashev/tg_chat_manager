@@ -102,3 +102,17 @@ class Ban:
         else:
             await context.bot.send_message(update.effective_chat.id,
                                            f"Пользователь @{update.message.reply_to_message.from_user.username} разбанен! 🥳")
+
+    async def ban_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE, duration: str = None):
+        if duration:
+            duration = parse_duration(context.args[0])
+            until_date = datetime.now(timezone.utc) + timedelta(seconds=duration)
+        else:
+            until_date = None
+
+        await context.bot.ban_chat_member(
+            chat_id=update.effective_chat.id,
+            user_id=update.message.reply_to_message.from_user.id,
+            until_date=until_date,
+            revoke_messages=True
+        )
