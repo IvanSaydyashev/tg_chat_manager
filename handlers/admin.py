@@ -3,7 +3,6 @@ from telegram.ext import ContextTypes
 from telegram.ext import CommandHandler, filters
 
 from services import ConsoleLog, FirebaseLog
-from comands import Mute, Ban, Kick
 
 
 class Admin:
@@ -13,6 +12,7 @@ class Admin:
         self.command_filter = ~filters.ChatType.PRIVATE & filters.COMMAND
 
     def handlers(self) -> list:
+        from comands import Mute, Ban, Kick
         return [
             CommandHandler("kick", Kick(console_log=self.console_logs), filters=~filters.ChatType.PRIVATE & filters.COMMAND),
             CommandHandler("dkick", Kick(console_log=self.console_logs).with_delete(), filters=~filters.ChatType.PRIVATE & filters.COMMAND),
