@@ -1,5 +1,3 @@
-from telegram import Update
-from telegram.ext import ContextTypes
 from telegram.ext import CommandHandler, filters
 
 from services import ConsoleLog, FirebaseLog
@@ -37,10 +35,4 @@ class Admin:
             CommandHandler("tsdmute", Mute(firebase_log=self.firebase_logs, console_log=self.console_logs).with_timer().with_delete().with_silent(), filters=self.command_filter),
             CommandHandler("unmute", Mute(firebase_log=self.firebase_logs, console_log=self.console_logs).with_invert(), filters=self.command_filter),
         ]
-
-    async def is_admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Check if the user that sent the message is an admin in the chat."""
-        user_id = update.effective_user.id
-        member = await update.effective_chat.get_member(user_id)
-        return member.status in ['administrator', 'creator']
 

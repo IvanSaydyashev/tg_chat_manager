@@ -4,12 +4,13 @@ from enum import Enum
 from json import dumps
 
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from services import FirebaseLog, ConsoleLog
 from services.log import FirebaseAction
 
-from .utils import parse_duration
+from .utils import parse_duration, is_admin
 from handlers.error import MissingDurationError, UserNotRepliedError, MissingReasonError
 
 
@@ -56,6 +57,8 @@ class Ban:
         return self
 
     async def __call__(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not await is_admin(update):
+            raise UserIsAdminError("Команда доступна только администраторам.")
         until_date = None
         reason = None
         if not self.invert:
@@ -86,6 +89,8 @@ class Ban:
                 )
         except AttributeError:
             raise UserNotRepliedError("Не указан пользователь — Необходимо ответить на сообщение пользователя.")
+        except BadRequest:
+            raise UserIsAdminError(f"Команда не применима к администраторам.")
 
         if not Additions.SILENT in self.adds:
             if not self.invert:

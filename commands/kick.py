@@ -1,11 +1,13 @@
 from typing import Self
 from enum import Enum
+
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from services import ConsoleLog
-from handlers.error import UserNotRepliedError
-
+from handlers.error import UserNotRepliedError, UserIsAdminError
+from .utils import is_admin
 
 class Additions(Enum):
     DELETE = "DELETE"
@@ -34,6 +36,8 @@ class Kick:
         return self
 
     async def __call__(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not await is_admin(update):
+            raise UserIsAdminError("Команда доступна только администраторам.")
         try:
             await context.bot.ban_chat_member(
                 chat_id=update.effective_chat.id,
@@ -46,6 +50,8 @@ class Kick:
             )
         except AttributeError:
             raise UserNotRepliedError("Не указан пользователь — Необходимо ответить на сообщение пользователя.")
+        except BadRequest:
+            raise UserIsAdminError(f"Команда не применима к администраторам.")
 
         if Additions.SILENT in self.adds:
             return

@@ -4,7 +4,6 @@ class BaseError(Exception):
 class UserNotRepliedError(BaseError):
     """Ошибка, если не ответили на сообщение."""
 
-
 class InvalidDurationFormatError(BaseError):
     """Ошибка, если введён некорректный формат времени."""
 

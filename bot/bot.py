@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timedelta
 
 from telegram import Update
 from telegram.error import TelegramError
@@ -66,5 +65,4 @@ class Bot:
         """Log the error and send a telegram message to notify the developer."""
         if isinstance(update, Update) and update.message:
             await self.console_logs.awrite(status=logging.ERROR, msg=f'Message "{update.message.text}" caused error: {context.error}')
-            if not isinstance(context.error, UserIsAdminError):
-                await update.message.reply_text(text=str(context.error))
+            await update.message.reply_text(text=str(context.error))
