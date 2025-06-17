@@ -1,5 +1,4 @@
 from datetime import datetime, timezone, timedelta
-import re
 from typing import Self
 from enum import Enum
 from json import dumps
@@ -11,7 +10,8 @@ from services import FirebaseLog, ConsoleLog
 from services.log import FirebaseAction
 
 from .utils import parse_duration
-from handlers.error import MissingDurationError, UserNotRepliedError
+from handlers.error import MissingDurationError, UserNotRepliedError, MissingReasonError
+
 
 class Additions(Enum):
     DELETE = "DELETE"
@@ -56,23 +56,14 @@ class Ban:
         return self
 
     async def __call__(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        # TODO: Добавить причину для бана
-        try:
-            log = {
-                "user_id": update.message.reply_to_message.from_user.id,
-                "chat_id": update.effective_chat.id,
-                "message": update.message.reply_to_message.text,
-                "reason": "",
-            }
-        except AttributeError:
-            raise UserNotRepliedError(f"Не указан пользователь — Необходимо ответить на сообщение пользователя")
-
-        if not self.invert:
-            await self.firebase_logs.awrite(FirebaseAction.BAN, dumps(log))
-        else:
-            await self.firebase_logs.awrite(FirebaseAction.UNBAN, dumps(log))
-
         until_date = None
+        reason = None
+        if not self.invert:
+            try:
+                reason = context.args[0]
+            except IndexError:
+                raise MissingReasonError(f"Не указана причина для мута – необходимо указать причину в одно слово")
+
         if not self.invert and Additions.TIMER in self.adds:
             try:
                 duration = parse_duration(context.args[0])
@@ -80,28 +71,40 @@ class Ban:
             except IndexError:
                 raise MissingDurationError(f"Не указано время для бана")
 
-        if self.invert:
-            await context.bot.unban_chat_member(
-                chat_id=update.effective_chat.id,
-                user_id=update.message.reply_to_message.from_user.id
-            )
-        else:
-            await context.bot.ban_chat_member(
-                chat_id=update.effective_chat.id,
-                user_id=update.message.reply_to_message.from_user.id,
-                until_date=until_date,
-                revoke_messages=True if Additions.DELETE in self.adds else False
-            )
+        try:
+            if self.invert:
+                await context.bot.unban_chat_member(
+                    chat_id=update.effective_chat.id,
+                    user_id=update.message.reply_to_message.from_user.id
+                )
+            else:
+                await context.bot.ban_chat_member(
+                    chat_id=update.effective_chat.id,
+                    user_id=update.message.reply_to_message.from_user.id,
+                    until_date=until_date,
+                    revoke_messages=True if Additions.DELETE in self.adds else False
+                )
+        except AttributeError:
+            raise UserNotRepliedError("Не указан пользователь — Необходимо ответить на сообщение пользователя.")
 
-        if Additions.SILENT in self.adds:
-            return
+        if not Additions.SILENT in self.adds:
+            if not self.invert:
+                await context.bot.send_message(update.effective_chat.id,
+                                           f"Пользователь @{update.message.reply_to_message.from_user.username} забанен!")
+            else:
+                await context.bot.send_message(update.effective_chat.id,
+                                               f"Пользователь @{update.message.reply_to_message.from_user.username} разбанен! 🥳")
 
+        log = {
+            "user_id": update.message.reply_to_message.from_user.id,
+            "chat_id": update.effective_chat.id,
+            "message": update.message.reply_to_message.text,
+            "reason": reason if reason else "Не указано",
+        }
         if not self.invert:
-            await context.bot.send_message(update.effective_chat.id,
-                                       f"Пользователь @{update.message.reply_to_message.from_user.username} забанен!")
+            await self.firebase_logs.awrite(FirebaseAction.BAN, dumps(log))
         else:
-            await context.bot.send_message(update.effective_chat.id,
-                                           f"Пользователь @{update.message.reply_to_message.from_user.username} разбанен! 🥳")
+            await self.firebase_logs.awrite(FirebaseAction.UNBAN, dumps(log))
 
     async def ban_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE, duration: str = None):
         if duration:

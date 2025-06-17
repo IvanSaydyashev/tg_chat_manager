@@ -1,5 +1,4 @@
 from datetime import datetime, timezone, timedelta
-import re
 from typing import Self
 from enum import Enum
 from json import dumps
@@ -10,7 +9,7 @@ from telegram.ext import ContextTypes
 from services import FirebaseLog, ConsoleLog
 from services.log import FirebaseAction
 from .utils import parse_duration
-from handlers.error import UserNotRepliedError, MissingDurationError
+from handlers.error import UserNotRepliedError, MissingDurationError, MissingReasonError
 
 class Additions(Enum):
     DELETE = "DELETE"
@@ -55,52 +54,59 @@ class Mute:
         return self
 
     async def __call__(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        # TODO: Добавить причину для мьюта
+        until_date = None
+        reason = None
+        if not self.invert:
+            try:
+                reason = context.args[0]
+            except IndexError:
+                raise MissingReasonError(f"Не указана причина для мута – необходимо указать причину в одно слово")
+
+        if not self.invert and Additions.TIMER in self.adds:
+            try:
+                duration = parse_duration(context.args[1])
+                until_date = datetime.now(timezone.utc) + timedelta(seconds=duration)
+            except IndexError:
+                raise MissingDurationError(f"Не указано время для бана")
+
+        # TODO: Нужно давать юзеру не все права, а только те, которые у него были
         try:
-            log = {
-                "user_id": update.message.reply_to_message.from_user.id,
-                "chat_id": update.effective_chat.id,
-                "message": update.message.reply_to_message.text,
-                "reason": "",
-            }
+            await context.bot.restrict_chat_member(
+                chat_id=update.effective_chat.id,
+                user_id=update.message.reply_to_message.from_user.id,
+                permissions=ChatPermissions.no_permissions() if not self.invert else ChatPermissions.all_permissions(),
+                until_date=until_date if not self.invert else None,
+            )
         except AttributeError:
             raise UserNotRepliedError("Не указан пользователь — Необходимо ответить на сообщение пользователя.")
+
+        if not self.invert and Additions.DELETE in self.adds:
+            await update.message.reply_to_message.delete()
+
+        if not Additions.SILENT in self.adds:
+            if not self.invert:
+                await context.bot.send_message(update.effective_chat.id,
+                                           f"Пользователь @{update.message.reply_to_message.from_user.username} в мьюте 🤫")
+            else:
+                await context.bot.send_message(update.effective_chat.id,
+                                               f"Пользователь @{update.message.reply_to_message.from_user.username} разговаривает! 🥳")
+
+        log = {
+            "user_id": update.message.reply_to_message.from_user.id,
+            "chat_id": update.effective_chat.id,
+            "message": update.message.reply_to_message.text,
+            "reason": reason if reason else "Не указано",
+        }
 
         if not self.invert:
             await self.firebase_logs.awrite(FirebaseAction.MUTE, dumps(log))
         else:
             await self.firebase_logs.awrite(FirebaseAction.UNMUTE, dumps(log))
 
-        until_date = None
-        if not self.invert and Additions.TIMER in self.adds:
-            try:
-                duration = parse_duration(context.args[0])
-                until_date = datetime.now(timezone.utc) + timedelta(seconds=duration)
-            except IndexError:
-                raise MissingDurationError(f"Не указано время для бана")
 
-        # TODO: Нужно давать юзеру не все права, а только те, которые у него были
-        await context.bot.restrict_chat_member(
-            chat_id=update.effective_chat.id,
-            user_id=update.message.reply_to_message.from_user.id,
-            permissions=ChatPermissions.no_permissions() if not self.invert else ChatPermissions.all_permissions(),
-            until_date=until_date if not self.invert else None,
-        )
-
-        if not self.invert and Additions.DELETE in self.adds:
-            await update.message.reply_to_message.delete()
-
-        if Additions.SILENT in self.adds:
-            return
-
-        if not self.invert:
-            await context.bot.send_message(update.effective_chat.id,
-                                       f"Пользователь @{update.message.reply_to_message.from_user.username} в мьюте 🤫")
-        else:
-            await context.bot.send_message(update.effective_chat.id,
-                                           f"Пользователь @{update.message.reply_to_message.from_user.username} разговаривает! 🥳")
-
-    async def mute_user(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int, duration: str | None = None) -> None:
+    async def mute_user(self, context: ContextTypes.DEFAULT_TYPE,
+                        message: str, chat_id: int, user_id: int, reason_llm: str,
+                        duration: str | None = None) -> None:
         if duration:
             duration = parse_duration(duration)
             until_date = datetime.now(timezone.utc) + timedelta(seconds=duration)
@@ -110,8 +116,8 @@ class Mute:
         await self.firebase_logs.awrite(FirebaseAction.MUTE, dumps({
             "user_id": user_id,
             "chat_id": chat_id,
-            "message": None,
-            "reason": "Автоматическая модерация (LLM)",
+            "message": message,
+            "reason": f"Автоматическая модерация (LLM) -> {reason_llm}",
         }))
 
         await context.bot.restrict_chat_member(
