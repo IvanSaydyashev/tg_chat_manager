@@ -1,3 +1,5 @@
+from telegram import Update
+
 from handlers.error import InvalidDurationFormatError
 import re
 
@@ -13,3 +15,9 @@ def parse_duration(s: str):
         "h": value * 3600,
         "d": value * 86400
     }[unit]
+
+async def is_admin(update: Update):
+    """Check if the user that sent the message is an admin in the chat."""
+    user_id = update.effective_user.id
+    member = await update.effective_chat.get_member(user_id)
+    return member.status in ['administrator', 'creator']

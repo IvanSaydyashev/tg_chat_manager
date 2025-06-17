@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from together import AsyncTogether
 
 import logging
@@ -16,6 +18,10 @@ class LLMService:
         except Exception as e:
             self.console_logs.write(status=logging.ERROR, msg=f"LLM initialization failed: {e}")
             raise RuntimeError(f"LLM initialization failed: {e}") from e
+
+    @lru_cache(maxsize=512)
+    async def validate_message_cached(self, message: str) -> (str, str):
+        return await self.validate_message(message)
 
     async def validate_message(self, message: str) -> (str, str):
         self.console_logs.write(status=logging.INFO, msg="Validating message...")
