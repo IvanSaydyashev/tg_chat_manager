@@ -7,7 +7,7 @@ from telegram.ext import CommandHandler
 
 from commands import Mute
 from services import LLMService, ConsoleLog, FirebaseLog, FirebaseClient
-from handlers import Admin
+from handlers import Admin, Auth
 from handlers.error import UserIsAdminError
 
 class Bot:
@@ -16,16 +16,18 @@ class Bot:
         self.firebase_db = firebase_client
         self.firebase_logs = firebase_log
         self.console_logs = console_log.with_name(__name__)
+
         self.admin = Admin(firebase_log=firebase_log, console_log=console_log, firebase_client=firebase_client)
+        self.auth = Auth(firebase_client=firebase_client)
+
         self.mute_handler = Mute(firebase_log=firebase_log, console_log=console_log)
-        self.ask_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Обжаловать наказание", callback_data="ask_data")]
-        ])
 
     def handlers(self) -> list[BaseHandler]:
         return [
             CommandHandler("help", self.help_command),
             MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.ChatType.PRIVATE, self.validate),
             *self.admin.handlers(),
+            *self.auth.handlers()
         ]
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -37,6 +39,8 @@ class Bot:
         status, reason = await self.llm_service.validate_message(update.message.text)
         msg = update.message
         if 'unsafe' in status:
+            ask_keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Обжаловать наказание", callback_data="ask_data")]])
             try:
                 user_moderation = await self.firebase_db.read(f"moderation/{msg.chat_id}/{msg.from_user.id}")
                 if user_moderation is not None:
@@ -50,7 +54,7 @@ class Bot:
                                                    text=f'Вы были забанены за сообщение: '
                                                         f'{update.message.text}\nПричина: {reason}\n'
                                                    f'Количество нарушений: {strike_count}/3',
-                                                   reply_markup=self.ask_keyboard)
+                                                   reply_markup=ask_keyboard)
                 else:
                     await self.mute_handler.mute_user(context, update.message.text, msg.chat_id,
                                                       msg.from_user.id, reason, "1h")
@@ -58,7 +62,7 @@ class Bot:
                                                    text=f'Вы были замьючены на 1 час за сообщение: '
                                                         f'{update.message.text}\nПричина: {reason}\n'
                                                    f'Количество нарушений: {strike_count}/3',
-                                                   reply_markup=self.ask_keyboard)
+                                                   reply_markup=ask_keyboard)
                 await self.firebase_db.update(f"moderation/{msg.chat_id}/{msg.from_user.id}",
                                               {"strikes": strike_count})
             except TelegramError:
