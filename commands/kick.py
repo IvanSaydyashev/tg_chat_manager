@@ -21,7 +21,6 @@ class Kick:
 
     def with_delete(self) -> Self:
         """
-        Works only in the MUTE case
         The message you replied to will be deleted.
         """
         self.adds.add(Additions.DELETE)
@@ -29,7 +28,6 @@ class Kick:
 
     def with_silent(self) -> Self:
         """
-        Works only in the MUTE case
         After the user is banned, the bot will send a notification.
         """
         self.adds.add(Additions.SILENT)

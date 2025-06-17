@@ -1,16 +1,17 @@
 from telegram.ext import CommandHandler, filters
 
-from services import ConsoleLog, FirebaseLog
+from services import ConsoleLog, FirebaseLog, FirebaseClient
 
 
 class Admin:
-    def __init__(self, firebase_log: FirebaseLog, console_log: ConsoleLog) -> None:
+    def __init__(self, firebase_log: FirebaseLog, console_log: ConsoleLog, firebase_client: FirebaseClient) -> None:
         self.firebase_logs = firebase_log
         self.console_logs = console_log.with_name(__name__)
         self.command_filter = ~filters.ChatType.PRIVATE & filters.COMMAND
+        self.firebase_db = firebase_client
 
     def handlers(self) -> list:
-        from commands import Mute, Ban, Kick
+        from commands import Mute, Ban, Kick, Strike
         return [
             CommandHandler("kick", Kick(console_log=self.console_logs), filters=~filters.ChatType.PRIVATE & filters.COMMAND),
             CommandHandler("dkick", Kick(console_log=self.console_logs).with_delete(), filters=~filters.ChatType.PRIVATE & filters.COMMAND),
@@ -36,5 +37,8 @@ class Admin:
             CommandHandler(["tsmute", "stmute"], Mute(firebase_log=self.firebase_logs, console_log=self.console_logs).with_timer().with_delete(), filters=self.command_filter),
             CommandHandler(["tsdmute", "tdsdmute", "stdmute", "sdtmute", "dtsmute", "dstmute"], Mute(firebase_log=self.firebase_logs, console_log=self.console_logs).with_timer().with_delete().with_silent(), filters=self.command_filter),
             CommandHandler("unmute", Mute(firebase_log=self.firebase_logs, console_log=self.console_logs).with_invert(), filters=self.command_filter),
+
+            CommandHandler("strike", Strike(console_log=self.console_logs, firebase_db=self.firebase_db).get(), filters=self.command_filter),
+            CommandHandler("rstrike", Strike(console_log=self.console_logs, firebase_db=self.firebase_db).reset(), filters=self.command_filter),
         ]
 

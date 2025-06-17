@@ -29,7 +29,7 @@ class Ban:
 
     def with_delete(self) -> Self:
         """
-        Works only in the MUTE case
+        Works only in the BAN case
         The message you replied to will be deleted.
         """
         self.adds.add(Additions.DELETE)
@@ -37,20 +37,20 @@ class Ban:
 
     def with_silent(self) -> Self:
         """
-        Works only in the MUTE case
+        Works only in the BAN case
         After the user is banned, the bot will send a notification.
         """
         self.adds.add(Additions.SILENT)
         return self
 
     def with_timer(self) -> Self:
-        """Works only in the MUTE case"""
+        """Works only in the BAN case"""
         self.adds.add(Additions.TIMER)
         return self
 
     def with_invert(self) -> Self:
         """
-        Now it is not MUTE, it is UNMUTE
+        Now it is not BAN, it is UNBAN
         The Silent and Timer modes are disabled.
         """
         self.invert = not self.invert

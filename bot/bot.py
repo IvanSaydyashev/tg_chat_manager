@@ -1,6 +1,6 @@
 import logging
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes, BaseHandler, MessageHandler, filters
 from telegram.ext import CommandHandler
@@ -16,8 +16,10 @@ class Bot:
         self.firebase_db = firebase_client
         self.firebase_logs = firebase_log
         self.console_logs = console_log.with_name(__name__)
-        self.admin = Admin(firebase_log=firebase_log, console_log=console_log)
+        self.admin = Admin(firebase_log=firebase_log, console_log=console_log, firebase_client=firebase_client)
         self.mute_handler = Mute(firebase_log=firebase_log, console_log=console_log)
+        self.ask_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("Обжаловать наказание", callback_data="ask_data")]
+        ])
 
     def handlers(self) -> list[BaseHandler]:
         return [
@@ -46,15 +48,17 @@ class Bot:
                     await context.bot.ban_chat_member(chat_id=msg.chat_id, user_id=msg.from_user.id)
                     await context.bot.send_message(chat_id=msg.from_user.id,
                                                    text=f'Вы были забанены за сообщение: '
-                                                        f'{update.message.text}\nПричина: {reason}'
-                                                   f'Количество нарушений: {strike_count}/3')
+                                                        f'{update.message.text}\nПричина: {reason}\n'
+                                                   f'Количество нарушений: {strike_count}/3',
+                                                   reply_markup=self.ask_keyboard)
                 else:
                     await self.mute_handler.mute_user(context, update.message.text, msg.chat_id,
                                                       msg.from_user.id, reason, "1h")
                     await context.bot.send_message(chat_id=msg.from_user.id,
-                                                   text=f'Вы были наказаны за сообщение: '
-                                                        f'{update.message.text}\nПричина: {reason}'
-                                                   f'Количество нарушений: {strike_count}/3')
+                                                   text=f'Вы были замьючены на 1 час за сообщение: '
+                                                        f'{update.message.text}\nПричина: {reason}\n'
+                                                   f'Количество нарушений: {strike_count}/3',
+                                                   reply_markup=self.ask_keyboard)
                 await self.firebase_db.update(f"moderation/{msg.chat_id}/{msg.from_user.id}",
                                               {"strikes": strike_count})
             except TelegramError:
