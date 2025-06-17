@@ -12,7 +12,7 @@ class Admin:
         self.command_filter = ~filters.ChatType.PRIVATE & filters.COMMAND
 
     def handlers(self) -> list:
-        from comands import Mute, Ban, Kick
+        from commands import Mute, Ban, Kick
         return [
             CommandHandler("kick", Kick(console_log=self.console_logs), filters=~filters.ChatType.PRIVATE & filters.COMMAND),
             CommandHandler("dkick", Kick(console_log=self.console_logs).with_delete(), filters=~filters.ChatType.PRIVATE & filters.COMMAND),

@@ -6,7 +6,7 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes, BaseHandler, MessageHandler, filters
 from telegram.ext import CommandHandler
 
-from comands import Mute
+from commands import Mute
 from services import LLMService, ConsoleLog, FirebaseLog, FirebaseClient
 from handlers import Admin
 from handlers.error import UserIsAdminError
